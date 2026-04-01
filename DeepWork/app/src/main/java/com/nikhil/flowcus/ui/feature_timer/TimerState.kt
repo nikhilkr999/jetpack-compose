@@ -8,5 +8,12 @@ data class TimerState(
     val isRunning: Boolean = false,
     val progress: Float = 1.0f,
     val selectedTask: Task? = null,
-    val startTimeMillis: Long = 0L
+    val startTimeMillis: Long = 0L,
+    val selectedAudio: AudioOption? = null
+)
+
+data class AudioOption(
+    val name: String,
+    val icon: Int, // Resource ID for the icon
+    val audioResId: Int // Resource ID for the raw audio file
 )

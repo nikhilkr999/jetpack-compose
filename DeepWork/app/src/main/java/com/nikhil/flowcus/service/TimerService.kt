@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.media.MediaPlayer
 import android.os.Binder
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -22,6 +23,7 @@ class TimerService : Service() {
 
     private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
     private var timerJob: Job? = null
+    private var mediaPlayer: MediaPlayer? = null
 
     private val _timeRemaining = MutableStateFlow(0L)
     val timeRemaining = _timeRemaining.asStateFlow()
@@ -59,6 +61,7 @@ class TimerService : Service() {
                 updateNotification(_timeRemaining.value)
             }
             _isRunning.value = false
+            stopAudio()
             onTimerFinished()
         }
     }
@@ -66,12 +69,14 @@ class TimerService : Service() {
     fun pauseTimer() {
         timerJob?.cancel()
         _isRunning.value = false
+        mediaPlayer?.pause()
         updateNotification(_timeRemaining.value)
     }
 
     fun resumeTimer() {
         if (_isRunning.value) return
         _isRunning.value = true
+        mediaPlayer?.start()
         timerJob = serviceScope.launch {
             while (_timeRemaining.value > 0) {
                 delay(1000L)
@@ -79,6 +84,7 @@ class TimerService : Service() {
                 updateNotification(_timeRemaining.value)
             }
             _isRunning.value = false
+            stopAudio()
             onTimerFinished()
         }
     }
@@ -86,8 +92,25 @@ class TimerService : Service() {
     fun stopTimer() {
         timerJob?.cancel()
         _isRunning.value = false
+        stopAudio()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    fun playAudio(audioResId: Int) {
+        stopAudio()
+        if (audioResId != 0) {
+            mediaPlayer = MediaPlayer.create(this, audioResId).apply {
+                isLooping = true
+                if (_isRunning.value) start()
+            }
+        }
+    }
+
+    fun stopAudio() {
+        mediaPlayer?.stop()
+        mediaPlayer?.release()
+        mediaPlayer = null
     }
 
     private fun onTimerFinished() {
@@ -136,6 +159,7 @@ class TimerService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         serviceScope.cancel()
+        stopAudio()
     }
 
     companion object {

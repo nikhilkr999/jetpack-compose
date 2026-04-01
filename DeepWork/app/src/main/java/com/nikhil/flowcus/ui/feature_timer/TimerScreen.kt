@@ -1,17 +1,22 @@
 package com.nikhil.flowcus.ui.feature_timer
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -82,8 +87,7 @@ fun TimerScreen(
 
         Row(modifier = Modifier.fillMaxWidth()) {
             val isPaused = !state.isRunning && state.timeRemaining < state.totalTime && state.timeRemaining > 0
-            val isNotStarted = !state.isRunning && state.timeRemaining == state.totalTime
-
+            
             if (state.isRunning) {
                 Button(
                     onClick = { viewModel.pauseTimer() },
@@ -117,6 +121,50 @@ fun TimerScreen(
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Text(
+            text = "Background Sounds",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.align(Alignment.Start)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Music items displayed row by row, 4 items per row
+        val audioOptions = getAudioOptions()
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            audioOptions.chunked(4).forEach { rowItems ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    rowItems.forEach { option ->
+                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                            AudioChip(
+                                option = option,
+                                isSelected = state.selectedAudio?.name == option.name,
+                                onClick = {
+                                    if (state.selectedAudio?.name == option.name) {
+                                        viewModel.onAudioSelected(null)
+                                    } else {
+                                        viewModel.onAudioSelected(option)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    // Fill empty slots if row has less than 4 items
+                    repeat(4 - rowItems.size) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
     }
 
     if (showTaskDialog) {
@@ -140,6 +188,72 @@ fun TimerScreen(
             onDismiss = { showDurationDialog = false }
         )
     }
+}
+
+@Composable
+fun AudioChip(
+    option: AudioOption,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val icon = when (option.name) {
+        "Rain" -> Icons.Default.WaterDrop
+        "Rain & Thunder" -> Icons.Default.Thunderstorm
+        "Forest" -> Icons.Default.Forest
+        "Wind" -> Icons.Default.Air
+        "Ocean" -> Icons.Default.Waves
+        "Instrument" -> Icons.Default.MusicNote
+        "lo-fi" -> Icons.Default.Headphones
+        "piano" -> Icons.Default.Piano
+        else -> Icons.AutoMirrored.Filled.QueueMusic
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clickable { onClick() }
+    ) {
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(CircleShape)
+                .background(
+                    if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.surfaceVariant
+                )
+                .border(
+                    width = 2.dp,
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    shape = CircleShape
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = option.name,
+                tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = option.name,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
+        )
+    }
+}
+
+private fun getAudioOptions(): List<AudioOption> {
+    return listOf(
+        AudioOption("Rain", 0, com.nikhil.flowcus.R.raw.rain),
+        AudioOption("Rain & Thunder", 0, com.nikhil.flowcus.R.raw.thunder),
+        AudioOption("Forest", 0, com.nikhil.flowcus.R.raw.forest),
+        AudioOption("Wind", 0, com.nikhil.flowcus.R.raw.wind),
+        AudioOption("Ocean", 0, com.nikhil.flowcus.R.raw.ocean),
+        AudioOption("Instrument", 0, com.nikhil.flowcus.R.raw.instrument),
+        AudioOption("lo-fi", 0, com.nikhil.flowcus.R.raw.lo_fi),
+        AudioOption("piano", 0, com.nikhil.flowcus.R.raw.minimal_piano)
+    )
 }
 
 @Composable

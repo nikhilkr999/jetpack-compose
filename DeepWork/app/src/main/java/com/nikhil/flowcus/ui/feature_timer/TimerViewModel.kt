@@ -64,7 +64,6 @@ class TimerViewModel @Inject constructor(
                     val wasRunning = _uiState.value.isRunning
                     
                     _uiState.update { state ->
-                        // Don't let the idle service (00:00) overwrite our initial/preset time
                         val newTime = if (!running && time == 0L && !wasRunning && state.timeRemaining > 0) {
                             state.timeRemaining
                         } else {
@@ -79,7 +78,6 @@ class TimerViewModel @Inject constructor(
                     }
                     
                     if (wasRunning && !running && time == 0L) {
-                        // Timer just finished naturally
                         saveSession()
                     }
                 }
@@ -101,6 +99,11 @@ class TimerViewModel @Inject constructor(
         ) }
     }
 
+    fun onAudioSelected(audio: AudioOption?) {
+        _uiState.update { it.copy(selectedAudio = audio) }
+        timerService?.playAudio(audio?.audioResId ?: 0)
+    }
+
     fun startTimer() {
         val intent = Intent(application, TimerService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -110,6 +113,11 @@ class TimerViewModel @Inject constructor(
         }
         timerService?.startTimer(_uiState.value.totalTime)
         _uiState.update { it.copy(startTimeMillis = System.currentTimeMillis()) }
+        
+        // Start audio if one was selected
+        _uiState.value.selectedAudio?.let {
+            timerService?.playAudio(it.audioResId)
+        }
     }
 
     fun pauseTimer() {
@@ -121,7 +129,7 @@ class TimerViewModel @Inject constructor(
     }
 
     fun stopTimer() {
-        saveSession() // Save progress before stopping
+        saveSession()
         timerService?.stopTimer()
         _uiState.update { it.copy(
             timeRemaining = it.totalTime,
@@ -147,7 +155,6 @@ class TimerViewModel @Inject constructor(
                 )
             }
         }
-        // Reset start time so we don't save the same session twice
         _uiState.update { it.copy(startTimeMillis = 0L) }
     }
 
