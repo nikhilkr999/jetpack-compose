@@ -104,6 +104,10 @@ class TimerViewModel @Inject constructor(
         timerService?.playAudio(audio?.audioResId ?: 0)
     }
 
+    fun toggleFullScreen() {
+        _uiState.update { it.copy(isFullScreen = !it.isFullScreen) }
+    }
+
     fun startTimer() {
         val intent = Intent(application, TimerService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

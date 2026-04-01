@@ -9,7 +9,8 @@ data class TimerState(
     val progress: Float = 1.0f,
     val selectedTask: Task? = null,
     val startTimeMillis: Long = 0L,
-    val selectedAudio: AudioOption? = null
+    val selectedAudio: AudioOption? = null,
+    val isFullScreen: Boolean = false
 )
 
 data class AudioOption(

@@ -1,5 +1,7 @@
 package com.nikhil.flowcus.ui.feature_timer
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,133 +36,150 @@ fun TimerScreen(
     var showTaskDialog by remember { mutableStateOf(false) }
     var showDurationDialog by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = modifier.fillMaxSize().padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Deep Work",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
-            )
-            IconButton(
-                onClick = { showDurationDialog = true },
-                enabled = !state.isRunning && state.timeRemaining == state.totalTime
-            ) {
-                Icon(Icons.Default.Settings, contentDescription = "Set Duration")
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(32.dp))
-
-        TimerDisplay(state)
-        
-        Spacer(modifier = Modifier.height(32.dp))
-
-        // Task Selection
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            onClick = { if (!state.isRunning) showTaskDialog = true }
+    if (state.isFullScreen) {
+        FullScreenTimer(
+            state = state,
+            onExitFullScreen = { viewModel.toggleFullScreen() },
+            onPause = { viewModel.pauseTimer() },
+            onResume = { viewModel.resumeTimer() },
+            onStop = { viewModel.stopTimer() }
+        )
+    } else {
+        Column(
+            modifier = modifier.fillMaxSize().padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1.0f)) {
-                    Text("Focusing on:", style = MaterialTheme.typography.labelMedium)
-                    Text(
-                        text = state.selectedTask?.title ?: "No task selected",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-                Icon(Icons.Default.Add, contentDescription = "Select Task")
-            }
-        }
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Row(modifier = Modifier.fillMaxWidth()) {
-            val isPaused = !state.isRunning && state.timeRemaining < state.totalTime && state.timeRemaining > 0
-            
-            if (state.isRunning) {
-                Button(
-                    onClick = { viewModel.pauseTimer() },
-                    modifier = Modifier.weight(1f).height(56.dp)
-                ) {
-                    Text("Pause")
-                }
-            } else if (isPaused) {
-                Button(
-                    onClick = { viewModel.resumeTimer() },
-                    modifier = Modifier.weight(1f).height(56.dp)
-                ) {
-                    Text("Resume")
-                }
-            } else {
-                Button(
-                    onClick = { viewModel.startTimer() },
-                    modifier = Modifier.weight(1f).height(56.dp)
-                ) {
-                    Text("Start")
-                }
-            }
-            
-            if (state.isRunning || isPaused) {
-                Spacer(modifier = Modifier.width(16.dp))
-                OutlinedButton(
-                    onClick = { viewModel.stopTimer() },
-                    modifier = Modifier.weight(1f).height(56.dp)
-                ) {
-                    Text("Stop")
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Text(
-            text = "Background Sounds",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.align(Alignment.Start)
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Music items displayed row by row, 4 items per row
-        val audioOptions = getAudioOptions()
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            audioOptions.chunked(4).forEach { rowItems ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    rowItems.forEach { option ->
-                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                            AudioChip(
-                                option = option,
-                                isSelected = state.selectedAudio?.name == option.name,
-                                onClick = {
-                                    if (state.selectedAudio?.name == option.name) {
-                                        viewModel.onAudioSelected(null)
-                                    } else {
-                                        viewModel.onAudioSelected(option)
-                                    }
-                                }
-                            )
-                        }
+                Text(
+                    text = "Deep Work",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Row {
+                    IconButton(
+                        onClick = { viewModel.toggleFullScreen() }
+                    ) {
+                        Icon(Icons.Default.Fullscreen, contentDescription = "Full Screen")
                     }
-                    // Fill empty slots if row has less than 4 items
-                    repeat(4 - rowItems.size) {
-                        Spacer(modifier = Modifier.weight(1f))
+                    IconButton(
+                        onClick = { showDurationDialog = true },
+                        enabled = !state.isRunning && state.timeRemaining == state.totalTime
+                    ) {
+                        Icon(Icons.Default.Settings, contentDescription = "Set Duration")
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(32.dp))
+
+            TimerDisplay(state)
+            
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Task Selection
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { if (!state.isRunning) showTaskDialog = true }
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1.0f)) {
+                        Text("Focusing on:", style = MaterialTheme.typography.labelMedium)
+                        Text(
+                            text = state.selectedTask?.title ?: "No task selected",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    Icon(Icons.Default.Add, contentDescription = "Select Task")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Row(modifier = Modifier.fillMaxWidth()) {
+                val isPaused = !state.isRunning && state.timeRemaining < state.totalTime && state.timeRemaining > 0
+                
+                if (state.isRunning) {
+                    Button(
+                        onClick = { viewModel.pauseTimer() },
+                        modifier = Modifier.weight(1f).height(56.dp)
+                    ) {
+                        Text("Pause")
+                    }
+                } else if (isPaused) {
+                    Button(
+                        onClick = { viewModel.resumeTimer() },
+                        modifier = Modifier.weight(1f).height(56.dp)
+                    ) {
+                        Text("Resume")
+                    }
+                } else {
+                    Button(
+                        onClick = { viewModel.startTimer() },
+                        modifier = Modifier.weight(1f).height(56.dp)
+                    ) {
+                        Text("Start")
+                    }
+                }
+                
+                if (state.isRunning || isPaused) {
+                    Spacer(modifier = Modifier.width(16.dp))
+                    OutlinedButton(
+                        onClick = { viewModel.stopTimer() },
+                        modifier = Modifier.weight(1f).height(56.dp)
+                    ) {
+                        Text("Stop")
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Text(
+                text = "Background Sounds",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.align(Alignment.Start)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Music items displayed row by row, 4 items per row
+            val audioOptions = getAudioOptions()
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                audioOptions.chunked(4).forEach { rowItems ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        rowItems.forEach { option ->
+                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                AudioChip(
+                                    option = option,
+                                    isSelected = state.selectedAudio?.name == option.name,
+                                    onClick = {
+                                        if (state.selectedAudio?.name == option.name) {
+                                            viewModel.onAudioSelected(null)
+                                        } else {
+                                            viewModel.onAudioSelected(option)
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                        // Fill empty slots if row has less than 4 items
+                        repeat(4 - rowItems.size) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
                     }
                 }
             }
@@ -187,6 +206,92 @@ fun TimerScreen(
             },
             onDismiss = { showDurationDialog = false }
         )
+    }
+}
+
+@Composable
+fun FullScreenTimer(
+    state: TimerState,
+    onExitFullScreen: () -> Unit,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onStop: () -> Unit
+) {
+    BackHandler { onExitFullScreen() }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(24.dp)
+    ) {
+        IconButton(
+            onClick = onExitFullScreen,
+            modifier = Modifier.align(Alignment.TopEnd)
+        ) {
+            Icon(Icons.Default.FullscreenExit, contentDescription = "Exit Full Screen")
+        }
+
+        Column(
+            modifier = Modifier.align(Alignment.Center),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = state.selectedTask?.title ?: "Focusing...",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Medium
+            )
+            
+            Spacer(modifier = Modifier.height(48.dp))
+
+            Box(contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(
+                    progress = { state.progress },
+                    modifier = Modifier.size(320.dp),
+                    strokeWidth = 16.dp,
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+                Text(
+                    text = formatTime(state.timeRemaining),
+                    fontSize = 72.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(64.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                if (state.isRunning) {
+                    FilledTonalIconButton(
+                        onClick = onPause,
+                        modifier = Modifier.size(72.dp)
+                    ) {
+                        Icon(Icons.Default.Pause, contentDescription = "Pause", modifier = Modifier.size(32.dp))
+                    }
+                } else {
+                    FilledIconButton(
+                        onClick = onResume,
+                        modifier = Modifier.size(72.dp)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = "Resume", modifier = Modifier.size(32.dp))
+                    }
+                }
+                
+                Spacer(modifier = Modifier.width(32.dp))
+
+                OutlinedIconButton(
+                    onClick = onStop,
+                    modifier = Modifier.size(72.dp)
+                ) {
+                    Icon(Icons.Default.Stop, contentDescription = "Stop", modifier = Modifier.size(32.dp))
+                }
+            }
+        }
     }
 }
 
