@@ -64,6 +64,12 @@ class TimerViewModel @Inject constructor(
                     val wasRunning = _uiState.value.isRunning
                     
                     _uiState.update { state ->
+                        // Update the remainder for the current active mode
+                        val updatedRemainders = state.modeRemainders.toMutableMap()
+                        if (running) {
+                            updatedRemainders[state.selectedMode] = time
+                        }
+
                         val newTime = if (!running && time == 0L && !wasRunning && state.timeRemaining > 0) {
                             state.timeRemaining
                         } else {
@@ -73,7 +79,8 @@ class TimerViewModel @Inject constructor(
                         state.copy(
                             timeRemaining = newTime,
                             isRunning = running,
-                            progress = if (state.totalTime > 0) newTime.toFloat() / state.totalTime else 1.0f
+                            progress = if (state.totalTime > 0) newTime.toFloat() / state.totalTime else 1.0f,
+                            modeRemainders = updatedRemainders
                         )
                     }
                     
@@ -85,6 +92,22 @@ class TimerViewModel @Inject constructor(
         }
     }
 
+    fun onModeSelected(mode: TimerMode) {
+        if (_uiState.value.isRunning) return
+        
+        _uiState.update { state ->
+            val newTotal = state.modeTotals[mode] ?: mode.seconds.toLong()
+            val newRemaining = state.modeRemainders[mode] ?: newTotal
+            
+            state.copy(
+                selectedMode = mode,
+                totalTime = newTotal,
+                timeRemaining = newRemaining,
+                progress = if (newTotal > 0) newRemaining.toFloat() / newTotal else 1.0f
+            )
+        }
+    }
+
     fun onTaskSelected(task: Task?) {
         _uiState.update { it.copy(selectedTask = task) }
     }
@@ -92,11 +115,21 @@ class TimerViewModel @Inject constructor(
     fun setTimerDuration(minutes: Int) {
         if (_uiState.value.isRunning) return
         val seconds = minutes * 60L
-        _uiState.update { it.copy(
-            totalTime = seconds,
-            timeRemaining = seconds,
-            progress = 1.0f
-        ) }
+        _uiState.update { state ->
+            val updatedTotals = state.modeTotals.toMutableMap()
+            val updatedRemainders = state.modeRemainders.toMutableMap()
+            
+            updatedTotals[state.selectedMode] = seconds
+            updatedRemainders[state.selectedMode] = seconds
+            
+            state.copy(
+                totalTime = seconds,
+                timeRemaining = seconds,
+                progress = 1.0f,
+                modeTotals = updatedTotals,
+                modeRemainders = updatedRemainders
+            )
+        }
     }
 
     fun onAudioSelected(audio: AudioOption?) {
@@ -115,7 +148,7 @@ class TimerViewModel @Inject constructor(
         } else {
             application.startService(intent)
         }
-        timerService?.startTimer(_uiState.value.totalTime)
+        timerService?.startTimer(_uiState.value.timeRemaining) // Use current remainder
         _uiState.update { it.copy(startTimeMillis = System.currentTimeMillis()) }
         
         // Start audio if one was selected
@@ -133,14 +166,20 @@ class TimerViewModel @Inject constructor(
     }
 
     fun stopTimer() {
-        saveSession()
+        saveSession() 
         timerService?.stopTimer()
-        _uiState.update { it.copy(
-            timeRemaining = it.totalTime,
-            progress = 1.0f,
-            isRunning = false,
-            startTimeMillis = 0L
-        ) }
+        _uiState.update { state ->
+            val updatedRemainders = state.modeRemainders.toMutableMap()
+            updatedRemainders[state.selectedMode] = state.totalTime
+            
+            state.copy(
+                timeRemaining = state.totalTime,
+                progress = 1.0f,
+                isRunning = false,
+                startTimeMillis = 0L,
+                modeRemainders = updatedRemainders
+            )
+        }
     }
 
     private fun saveSession() {
@@ -148,7 +187,7 @@ class TimerViewModel @Inject constructor(
         if (state.startTimeMillis == 0L) return
 
         val duration = state.totalTime - state.timeRemaining
-        if (duration > 0) {
+        if (duration > 0 && state.selectedMode == TimerMode.FOCUS) {
             viewModelScope.launch {
                 focusSessionDao.insertSession(
                     FocusSession(

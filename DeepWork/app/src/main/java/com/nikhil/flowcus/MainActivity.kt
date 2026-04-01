@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -26,7 +27,14 @@ import com.nikhil.flowcus.ui.feature_analytics.AnalyticsScreen
 import com.nikhil.flowcus.ui.feature_tasks.TasksScreen
 import com.nikhil.flowcus.ui.feature_timer.TimerScreen
 import com.nikhil.flowcus.ui.theme.FlowcusTheme
+import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.AndroidEntryPoint
+
+// Same colors used in TimerScreen for consistency
+private val BackgroundDark   = Color(0xFF111116)
+private val SurfaceDark      = Color(0xFF1C1C24)
+private val Amber            = Color(0xFFE8C47A)
+private val TextMuted        = Color(0xFF555555)
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -50,8 +58,12 @@ class MainActivity : ComponentActivity() {
                 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
+                    containerColor = BackgroundDark,
                     bottomBar = {
-                        NavigationBar {
+                        NavigationBar(
+                            containerColor = BackgroundDark,
+                            contentColor = TextMuted
+                        ) {
                             val navBackStackEntry by navController.currentBackStackEntryAsState()
                             val currentDestination = navBackStackEntry?.destination?.route
 
@@ -62,8 +74,9 @@ class MainActivity : ComponentActivity() {
                             )
 
                             items.forEach { item ->
+                                val selected = currentDestination == item.route
                                 NavigationBarItem(
-                                    selected = currentDestination == item.route,
+                                    selected = selected,
                                     onClick = {
                                         navController.navigate(item.route) {
                                             popUpTo(navController.graph.findStartDestination().id) {
@@ -73,8 +86,26 @@ class MainActivity : ComponentActivity() {
                                             restoreState = true
                                         }
                                     },
-                                    icon = { Icon(item.icon, contentDescription = item.label) },
-                                    label = { Text(item.label) }
+                                    icon = { 
+                                        Icon(
+                                            item.icon, 
+                                            contentDescription = item.label,
+                                            tint = if (selected) Amber else TextMuted
+                                        ) 
+                                    },
+                                    label = { 
+                                        Text(
+                                            item.label,
+                                            color = if (selected) Amber else TextMuted
+                                        ) 
+                                    },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = Amber,
+                                        selectedTextColor = Amber,
+                                        unselectedIconColor = TextMuted,
+                                        unselectedTextColor = TextMuted,
+                                        indicatorColor = SurfaceDark
+                                    )
                                 )
                             }
                         }
