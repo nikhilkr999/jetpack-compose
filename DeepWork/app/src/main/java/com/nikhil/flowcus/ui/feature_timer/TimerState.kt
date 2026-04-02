@@ -19,7 +19,9 @@ data class TimerState(
     val isFullScreen: Boolean = false,
     val selectedMode: TimerMode = TimerMode.FOCUS,
     val modeRemainders: Map<TimerMode, Long> = TimerMode.entries.associateWith { it.seconds.toLong() },
-    val modeTotals: Map<TimerMode, Long> = TimerMode.entries.associateWith { it.seconds.toLong() }
+    val modeTotals: Map<TimerMode, Long> = TimerMode.entries.associateWith { it.seconds.toLong() },
+    val appLockEnabled: Boolean = true,
+    val isDarkMode: Boolean = true
 )
 
 data class AudioOption(

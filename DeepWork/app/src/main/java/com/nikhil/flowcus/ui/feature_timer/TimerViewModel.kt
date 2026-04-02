@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Build
 import android.os.IBinder
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nikhil.flowcus.data.FocusSession
@@ -23,7 +24,8 @@ import javax.inject.Inject
 class TimerViewModel @Inject constructor(
     private val application: Application,
     private val taskDao: TaskDao,
-    private val focusSessionDao: FocusSessionDao
+    private val focusSessionDao: FocusSessionDao,
+    savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TimerState())
@@ -53,6 +55,21 @@ class TimerViewModel @Inject constructor(
         Intent(application, TimerService::class.java).also { intent ->
             application.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
         }
+
+        // Handle initial task selection from navigation arguments
+        val taskId: Int? = savedStateHandle.get<String>("taskId")?.toIntOrNull()
+        if (taskId != null && taskId != -1) {
+            onTaskIdReceived(taskId)
+        }
+    }
+
+    fun onTaskIdReceived(taskId: Int) {
+        viewModelScope.launch {
+            val task = taskDao.getTaskById(taskId)
+            if (task != null) {
+                onTaskSelected(task)
+            }
+        }
     }
 
     private fun observeService() {
@@ -64,7 +81,6 @@ class TimerViewModel @Inject constructor(
                     val wasRunning = _uiState.value.isRunning
                     
                     _uiState.update { state ->
-                        // Update the remainder for the current active mode
                         val updatedRemainders = state.modeRemainders.toMutableMap()
                         if (running) {
                             updatedRemainders[state.selectedMode] = time
@@ -132,9 +148,46 @@ class TimerViewModel @Inject constructor(
         }
     }
 
+    fun setModeDuration(mode: TimerMode, minutes: Int) {
+        val seconds = minutes * 60L
+        _uiState.update { state ->
+            val updatedTotals = state.modeTotals.toMutableMap()
+            val updatedRemainders = state.modeRemainders.toMutableMap()
+            
+            updatedTotals[mode] = seconds
+            // Only update remainder if the mode is not currently running or paused
+            if (state.selectedMode != mode || (state.timeRemaining == state.totalTime)) {
+                updatedRemainders[mode] = seconds
+            }
+            
+            var newState = state.copy(
+                modeTotals = updatedTotals,
+                modeRemainders = updatedRemainders
+            )
+
+            // If the updated mode is the currently selected one, update the current timer display too
+            if (state.selectedMode == mode && !state.isRunning && state.timeRemaining == state.totalTime) {
+                newState = newState.copy(
+                    totalTime = seconds,
+                    timeRemaining = seconds,
+                    progress = 1.0f
+                )
+            }
+            newState
+        }
+    }
+
     fun onAudioSelected(audio: AudioOption?) {
         _uiState.update { it.copy(selectedAudio = audio) }
         timerService?.playAudio(audio?.audioResId ?: 0)
+    }
+
+    fun toggleAppLock(enabled: Boolean) {
+        _uiState.update { it.copy(appLockEnabled = enabled) }
+    }
+
+    fun toggleDarkMode(enabled: Boolean) {
+        _uiState.update { it.copy(isDarkMode = enabled) }
     }
 
     fun toggleFullScreen() {
@@ -148,10 +201,9 @@ class TimerViewModel @Inject constructor(
         } else {
             application.startService(intent)
         }
-        timerService?.startTimer(_uiState.value.timeRemaining) // Use current remainder
+        timerService?.startTimer(_uiState.value.timeRemaining) 
         _uiState.update { it.copy(startTimeMillis = System.currentTimeMillis()) }
         
-        // Start audio if one was selected
         _uiState.value.selectedAudio?.let {
             timerService?.playAudio(it.audioResId)
         }
@@ -169,11 +221,12 @@ class TimerViewModel @Inject constructor(
         saveSession() 
         timerService?.stopTimer()
         _uiState.update { state ->
+            val resetTime = state.modeTotals[state.selectedMode] ?: state.selectedMode.seconds.toLong()
             val updatedRemainders = state.modeRemainders.toMutableMap()
-            updatedRemainders[state.selectedMode] = state.totalTime
+            updatedRemainders[state.selectedMode] = resetTime
             
             state.copy(
-                timeRemaining = state.totalTime,
+                timeRemaining = resetTime,
                 progress = 1.0f,
                 isRunning = false,
                 startTimeMillis = 0L,

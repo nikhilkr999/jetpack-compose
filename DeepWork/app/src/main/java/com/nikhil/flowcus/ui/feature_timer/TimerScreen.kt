@@ -58,9 +58,17 @@ fun TimerScreen(
     val state by viewModel.uiState.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
     var showTaskDialog by remember { mutableStateOf(false) }
-    var showDurationDialog by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
 
-    if (state.isFullScreen) {
+    if (showSettings) {
+        SettingsScreen(
+            state = state,
+            onDismiss = { showSettings = false },
+            onModeDurationChanged = { mode, minutes -> viewModel.setModeDuration(mode, minutes) },
+            onAppLockToggled = { viewModel.toggleAppLock(it) },
+            onDarkModeToggled = { viewModel.toggleDarkMode(it) }
+        )
+    } else if (state.isFullScreen) {
         FullScreenTimer(
             state = state,
             onExitFullScreen = { viewModel.toggleFullScreen() },
@@ -83,7 +91,7 @@ fun TimerScreen(
             ) {
                 // Header
                 TimerHeader(
-                    onSettingsClick = { showDurationDialog = true },
+                    onSettingsClick = { showSettings = true },
                     onFullScreenClick = { viewModel.toggleFullScreen() },
                     isTimerRunning = state.isRunning,
                     isAtStart = state.timeRemaining == state.totalTime
@@ -157,17 +165,197 @@ fun TimerScreen(
             onDismiss = { showTaskDialog = false }
         )
     }
+}
 
-    if (showDurationDialog) {
-        DurationDialog(
-            currentMinutes = (state.totalTime / 60).toInt(),
-            onConfirm = { minutes ->
-                viewModel.setTimerDuration(minutes)
-                showDurationDialog = false
-            },
-            onDismiss = { showDurationDialog = false }
-        )
+@Composable
+fun SettingsScreen(
+    state: TimerState,
+    onDismiss: () -> Unit,
+    onModeDurationChanged: (TimerMode, Int) -> Unit,
+    onAppLockToggled: (Boolean) -> Unit,
+    onDarkModeToggled: (Boolean) -> Unit
+) {
+    BackHandler { onDismiss() }
+    
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = BackgroundDark
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 22.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Settings",
+                    fontSize = 28.sp,
+                    fontFamily = FontFamily.Serif,
+                    color = TextPrimary
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = TextPrimary)
+                }
+            }
+
+            // Timer Settings
+            Text("TIMER DURATIONS", color = TextSecondary, fontSize = 10.sp, letterSpacing = 2.sp)
+            Spacer(Modifier.height(24.dp))
+            
+            TimerMode.entries.forEach { mode ->
+                Text(mode.label.uppercase(), color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(8.dp))
+                val currentMins = (state.modeTotals[mode] ?: mode.seconds.toLong()) / 60
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Slider(
+                        value = currentMins.toFloat(),
+                        onValueChange = { onModeDurationChanged(mode, it.toInt()) },
+                        valueRange = 1f..120f,
+                        modifier = Modifier.weight(1f),
+                        colors = SliderDefaults.colors(
+                            thumbColor = Amber,
+                            activeTrackColor = Amber,
+                            inactiveTrackColor = SurfaceDark
+                        )
+                    )
+                    Spacer(Modifier.width(16.dp))
+                    Text("${currentMins.toInt()}m", color = Amber, fontSize = 14.sp, modifier = Modifier.width(40.dp))
+                }
+                Spacer(Modifier.height(16.dp))
+            }
+
+            Spacer(Modifier.height(24.dp))
+            HorizontalDivider(color = BorderDark)
+            Spacer(Modifier.height(24.dp))
+
+            // App Lock
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("App Lock", color = TextPrimary, fontSize = 16.sp)
+                    Text("Block all other apps during focus", color = TextSecondary, fontSize = 12.sp)
+                }
+                Switch(
+                    checked = state.appLockEnabled,
+                    onCheckedChange = onAppLockToggled,
+                    colors = SwitchDefaults.colors(checkedThumbColor = Amber, checkedTrackColor = Amber.copy(alpha = 0.4f))
+                )
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            // Dark Mode
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Dark Mode", color = TextPrimary, fontSize = 16.sp)
+                    Text("Use dark interface theme", color = TextSecondary, fontSize = 12.sp)
+                }
+                Switch(
+                    checked = state.isDarkMode,
+                    onCheckedChange = onDarkModeToggled,
+                    colors = SwitchDefaults.colors(checkedThumbColor = Amber, checkedTrackColor = Amber.copy(alpha = 0.4f))
+                )
+            }
+
+            Spacer(Modifier.height(32.dp))
+            HorizontalDivider(color = BorderDark)
+            Spacer(Modifier.height(24.dp))
+
+            // About
+            Text("ABOUT", color = TextSecondary, fontSize = 10.sp, letterSpacing = 2.sp)
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "Flowcus helps you reclaim your focus and enter a state of deep work. By combining a minimalist timer, task tracking, and background soundscapes, we provide the tools you need to stay productive.",
+                color = TextSecondary,
+                fontSize = 13.sp,
+                lineHeight = 20.sp
+            )
+            Spacer(Modifier.height(16.dp))
+            Text("Version 1.0.0", color = TextMuted, fontSize = 12.sp)
+            
+            Spacer(Modifier.height(40.dp))
+        }
     }
+}
+
+@Composable
+fun TaskSelectionDialog(
+    tasks: List<Task>,
+    onTaskSelected: (Task) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceDark,
+        shape = RoundedCornerShape(28.dp),
+        title = { 
+            Text(
+                "Select Task", 
+                color = TextPrimary, 
+                fontFamily = FontFamily.Serif,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            ) 
+        },
+        text = {
+            if (tasks.isEmpty()) {
+                Text(
+                    "No tasks available. Go to the Tasks tab to add some!", 
+                    color = TextSecondary, 
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Center
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 300.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(tasks) { task ->
+                        Card(
+                            onClick = { onTaskSelected(task) },
+                            colors = CardDefaults.cardColors(containerColor = BackgroundDark),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(task.category.icon, modifier = Modifier.padding(end = 12.dp))
+                                Text(
+                                    text = task.title,
+                                    color = TextPrimary,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { 
+                Text("CLOSE", color = Amber, letterSpacing = 1.sp) 
+            }
+        }
+    )
 }
 
 @Composable
@@ -201,13 +389,12 @@ fun TimerHeader(
             }
             IconButton(
                 onClick = onSettingsClick,
-                enabled = !isTimerRunning && isAtStart,
                 modifier = Modifier.size(24.dp)
             ) {
                 Icon(
                     imageVector        = Icons.Default.Settings,
                     contentDescription = "Settings",
-                    tint               = if (!isTimerRunning && isAtStart) TextPrimary.copy(alpha = 0.5f) else TextMuted
+                    tint               = TextPrimary.copy(alpha = 0.5f)
                 )
             }
         }
@@ -687,35 +874,6 @@ fun DurationDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
-    )
-}
-
-@Composable
-fun TaskSelectionDialog(
-    tasks: List<Task>,
-    onTaskSelected: (Task) -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Select Task") },
-        text = {
-            if (tasks.isEmpty()) {
-                Text("No tasks available. Go to the Tasks tab to add some!")
-            } else {
-                LazyColumn {
-                    items(tasks) { task ->
-                        ListItem(
-                            headlineContent = { Text(task.title) },
-                            modifier = Modifier.clickable { onTaskSelected(task) }
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Close") }
         }
     )
 }
